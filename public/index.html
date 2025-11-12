@@ -1,0 +1,296 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8" />
+  <title>📡 Modem Manager - Live</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body { background:#f7f9fc; }
+    .badge-provider { font-size:0.9rem; }
+    .loading-overlay {
+      position: fixed; inset: 0; background: rgba(255,255,255,0.8);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 9999; display: none;
+    }
+    .spinner-border { width: 3rem; height: 3rem; }
+    textarea.form-control { resize: none; white-space: pre-wrap; }
+  </style>
+</head>
+<body>
+  <div class="container py-4">
+    <h3 class="mb-3 text-center">📡 Modem Manager (Live)</h3>
+    <div class="mb-2 d-flex justify-content-between align-items-center">
+      <div>
+        <button id="btnRefresh" class="btn btn-outline-primary btn-sm">🔄 Refresh Now</button>
+        <span id="status" class="ms-3 text-muted">Menunggu data...</span>
+      </div>
+      <div>
+        <small class="text-muted">Realtime via Socket.IO</small>
+      </div>
+    </div>
+
+    <div class="table-responsive shadow-sm rounded-3">
+      <table class="table table-hover align-middle bg-white">
+        <thead class="table-dark">
+          <tr>
+            <th>Port</th>
+            <th>Modem</th>
+            <th>Provider / IMSI</th>
+            <th>Status</th>
+            <th>Aksi</th>
+          </tr>
+        </thead>
+        <tbody id="portTable"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Loading Overlay -->
+  <div id="loading" class="loading-overlay">
+    <div class="text-center">
+      <div class="spinner-border text-primary" role="status"></div>
+      <div class="mt-2 fw-semibold text-primary">Memproses...</div>
+    </div>
+  </div>
+
+<!-- Modal SMS Interaktif -->
+<div class="modal fade" id="smsModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content shadow-lg border-0">
+      <div class="modal-header bg-info text-white">
+        <h5 class="modal-title">📩 SMS Interaktif</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="smsPort">
+        <div class="mb-2">
+          <label class="form-label small fw-semibold text-muted">Nomor Tujuan</label>
+          <input type="text" id="smsNumber" class="form-control" placeholder="contoh: 08123456789">
+        </div>
+        <div id="smsChatBox" class="border rounded-3 p-2 mb-3 bg-light" style="height:280px; overflow-y:auto; font-size:0.9rem;">
+          <div class="text-center text-muted mt-3">Belum ada pesan</div>
+        </div>
+        <div class="input-group">
+          <input type="text" id="smsMessage" class="form-control" placeholder="Ketik pesan...">
+          <button id="sendSmsBtn" class="btn btn-info text-white fw-semibold">Kirim</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+  <!-- Modal USSD Interaktif -->
+  <div class="modal fade" id="ussdModal" tabindex="-1" aria-labelledby="ussdTitle" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+      <div class="modal-content">
+        <div class="modal-header bg-warning">
+          <h5 class="modal-title" id="ussdTitle">USSD Session</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <textarea id="ussdResponse" class="form-control" rows="10" readonly>📡 Tidak ada sesi aktif.</textarea>
+          <div class="input-group mt-3">
+            <input type="text" id="ussdCode" class="form-control" placeholder="Ketik *888# atau angka lanjutan...">
+            <button id="ussdSendBtn" class="btn btn-primary">Kirim</button>
+            <button id="ussdEndBtn" class="btn btn-outline-danger">Akhiri</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Hasil -->
+  <div class="modal fade" id="resultModal" tabindex="-1">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header bg-success text-white">
+          <h5 class="modal-title">📞 Hasil Respon</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body" id="resultBody"></div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+  const socket = io();
+  const table = document.getElementById("portTable");
+  const status = document.getElementById("status");
+  const loading = document.getElementById("loading");
+  
+  const smsModal = new bootstrap.Modal(document.getElementById("smsModal"));
+  const ussdModal = new bootstrap.Modal(document.getElementById("ussdModal"));
+  const resultModal = new bootstrap.Modal(document.getElementById("resultModal"));
+
+  // === SMS ===
+const smsChatBox = document.getElementById("smsChatBox");
+const sendSmsBtn = document.getElementById("sendSmsBtn");
+const smsNumber = document.getElementById("smsNumber");
+const smsMessage = document.getElementById("smsMessage");
+
+  const ussdResponse = document.getElementById("ussdResponse");
+  const ussdCode = document.getElementById("ussdCode");
+  const ussdSendBtn = document.getElementById("ussdSendBtn");
+  const ussdEndBtn = document.getElementById("ussdEndBtn");
+  const resultBody = document.getElementById("resultBody");
+
+  let activePort = null;
+
+  function showLoading(v){ loading.style.display = v ? "flex" : "none"; }
+  function escapeHtml(s){return (s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");}
+
+  // === Render tabel ===
+  function renderRows(ports){
+    if(!ports || ports.length===0){
+      table.innerHTML=`<tr><td colspan="5" class="text-center">Tidak ada modem terdeteksi</td></tr>`;
+      return;
+    }
+    table.innerHTML=ports.map(p=>`
+      <tr>
+        <td>${p.port}</td>
+        <td>${escapeHtml(p.modem||p.manufacturer||"Unknown")}</td>
+        <td>
+          ${p.provider?`<span class="badge bg-success badge-provider">${p.provider}</span>`:`<span class="badge bg-secondary">Unknown</span>`}
+          ${p.imsi?`<div class="text-muted small">${p.imsi}</div>`:""}
+        </td>
+        <td>${p.status==="ready"
+          ?`<span class="badge bg-success">Ready</span>`
+          :p.status==="connecting"
+          ?`<span class="badge bg-warning">Connecting</span>`
+          :`<span class="badge bg-danger">${p.status}</span>`}
+          ${p.error?`<div class="text-danger small">${escapeHtml(p.error)}</div>`:""}
+        </td>
+        <td>
+          <button class="btn btn-sm btn-info me-1 text-white" onclick="openSMS('${p.port}')">📩 SMS</button>
+          <button class="btn btn-sm btn-warning" onclick="openUSSD('${p.port}')">📞 Dial</button>
+        </td>
+      </tr>`).join("");
+  }
+
+  // === SOCKET EVENTS ===
+  socket.on("connect",()=>status.textContent="Connected to server");
+  socket.on("disconnect",()=>status.textContent="Disconnected");
+  socket.on("ports",data=>{
+    status.textContent=`Last update: ${new Date().toLocaleTimeString()}`;
+    renderRows(data);
+  });
+
+  // === SMS ===
+function openSMS(port){
+  document.getElementById("smsPort").value = port;
+  smsNumber.value = "";
+  smsMessage.value = "";
+  smsChatBox.innerHTML = `<div class="text-center text-muted mt-3">Belum ada pesan</div>`;
+  smsModal.show();
+}
+
+function appendSms(role, text){
+  const div = document.createElement("div");
+  div.className = role === "user"
+    ? "text-end text-primary mb-2"
+    : "text-start text-success mb-2";
+  div.innerHTML = `<b>${role === "user" ? "Kamu:" : "Balasan:"}</b> ${escapeHtml(text)}`;
+  smsChatBox.appendChild(div);
+  smsChatBox.scrollTop = smsChatBox.scrollHeight;
+}
+
+ 
+sendSmsBtn.addEventListener("click", async ()=>{
+  const port = document.getElementById("smsPort").value;
+  const number = smsNumber.value.trim();
+  const message = smsMessage.value.trim();
+  if(!number || !message) return alert("Lengkapi nomor dan pesan!");
+  
+  appendSms("user", message);
+  smsMessage.value = "";
+
+  try{
+    const res = await fetch("/sms", {
+      method: "POST",
+      headers: {"Content-Type":"application/json"},
+      body: JSON.stringify({port, number, message})
+    });
+    const j = await res.json();
+    if(j.error) appendSms("server", "❌ Gagal: " + j.error);
+    else appendSms("server", "✅ SMS terkirim.");
+  }catch(err){
+    appendSms("server", "⚠️ Error: " + err.message);
+  }
+});
+
+// Saat server kirim notifikasi SMS masuk
+socket.on("port-notification", (data)=>{
+  if(!data.line) return;
+  // Hanya tampilkan yang berhubungan dengan SMS masuk
+  if(data.line.includes("+CMT:") || data.line.includes("+CMGR")) {
+    const msg = data.line.replace(/\r|\n/g,"").trim();
+    appendSms("server", msg);
+  }
+});
+
+  // === USSD ===
+  function openUSSD(port){
+    activePort = port;
+    ussdResponse.value = "📡 Masukkan kode untuk memulai (misal *888#)";
+    ussdCode.value = "";
+    ussdSendBtn.disabled = false;
+    ussdModal.show();
+  }
+
+  async function sendUSSD(){
+    const code = ussdCode.value.trim();
+    if(!code) return alert("Masukkan kode atau angka!");
+    showLoading(true);
+    try{
+      const res = await fetch("/dial",{
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({port:activePort, code})
+      });
+      const j = await res.json();
+      showLoading(false);
+      if(j.error){
+        ussdResponse.value += `\n❌ ${j.error}`;
+      }else{
+        if(ussdResponse.value.startsWith("📡 Masukkan")) ussdResponse.value="";
+        ussdResponse.value += `\n➡️ ${code}\n📡 ${j.response||"(tidak ada respon)"}`;
+        if(j.sessionEnd){
+          ussdResponse.value += "\n✅ Sesi selesai.";
+          ussdSendBtn.disabled = true;
+        }
+      }
+      ussdResponse.scrollTop = ussdResponse.scrollHeight;
+    }catch(err){
+      showLoading(false);
+      ussdResponse.value += `\n⚠️ Error: ${err.message}`;
+    }
+    ussdCode.value="";
+  }
+
+  async function endUSSD(){
+    if(!activePort) return;
+    await fetch("/ussd/end",{
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({port:activePort})
+    });
+    ussdResponse.value += "\n⛔ Sesi diakhiri manual.";
+    ussdSendBtn.disabled = true;
+  }
+
+  function showResult(title,content){
+    document.querySelector("#resultModal .modal-title").innerHTML=title;
+    resultBody.innerHTML=content;
+    resultModal.show();
+  }
+
+  ussdSendBtn.addEventListener("click",sendUSSD);
+  ussdEndBtn.addEventListener("click",endUSSD);
+  document.getElementById("btnRefresh").addEventListener("click",()=>fetch("/").catch(()=>{}));
+  </script>
+</body>
+</html>
