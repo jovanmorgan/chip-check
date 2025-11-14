@@ -79,6 +79,24 @@ async function probePort(path) {
       }
     }
 
+    // === Tambahan: ambil SN (IMEI) dan MSISDN ===
+const cgsn = await sendAT("AT+CGSN");
+const sn = cgsn.find(l => /^\d{10,20}$/.test(l)) || null;
+if (sn) info.sn = sn;
+
+// coba ambil MSISDN (nomor SIM)
+const cnum = await sendAT("AT+CNUM");
+let msisdn = null;
+for (const line of cnum) {
+  const m = line.match(/"(\+?\d{7,15})"/);
+  if (m) {
+    msisdn = m[1];
+    break;
+  }
+}
+if (msisdn) info.msisdn = msisdn;
+
+
     // try get IMSI if provider unknown or as fallback
     const cimires = await sendAT("AT+CIMI");
     const imsi = cimires.find(l => /^\d{5,}$/.test(l)) || null;
@@ -102,6 +120,58 @@ async function probePort(path) {
     info.provider = provider;
     info.manufacturer = serial.manufacturer || "";
     info.status = "ready";
+
+// aktifkan notifikasi SMS otomatis
+await new Promise(r => serial.write("AT+CMGF=1\r", r)); // text mode
+await new Promise(r => setTimeout(r, 300));
+await new Promise(r => serial.write("AT+CNMI=2,1,0,0,0\r", r)); // notif SMS masuk
+await new Promise(r => setTimeout(r, 300));
+
+// store in map
+portMap.set(path, {
+  port: serial,
+  parser,
+  info,
+  lastSeen: Date.now()
+});
+
+// listen for disconnection
+serial.on("close", () => {
+  info.status = "disconnected";
+});
+
+// === Tambahkan listener global SMS ===
+parser.on("data", (line) => {
+  if (!line) return;
+  line = line.trim();
+
+  // kirim ke UI semua notifikasi modem
+  io.emit("port-notification", { port: path, line });
+
+  // bila ada SMS baru masuk
+  if (line.includes("+CMTI:")) {
+    const match = line.match(/\+CMTI: ".*",(\d+)/);
+    if (match) {
+      const index = match[1];
+      // baca isi SMS
+      serial.write(`AT+CMGR=${index}\r`);
+    }
+  }
+
+  // deteksi isi SMS
+  if (line.startsWith("+CMGR:")) {
+    info._collecting = true;
+    info._msg = "";
+  } else if (info._collecting && line !== "OK" && !line.startsWith("AT+CMGR")) {
+    info._msg += line + "\n";
+  } else if (info._collecting && line === "OK") {
+    info._collecting = false;
+    const cleanMsg = info._msg.trim();
+    if (cleanMsg) {
+      io.emit("port-notification", { port: path, line: `📩 SMS Masuk: ${cleanMsg}` });
+    }
+  }
+});
 
     // store in map
     portMap.set(path, {
@@ -162,15 +232,17 @@ async function scanPorts() {
     }
 
     // emit ke frontend
-    const payload = Array.from(portMap.values()).map(e => ({
-      port: e.info.port,
-      manufacturer: e.info.manufacturer,
-      modem: e.info.modem,
-      provider: e.info.provider,
-      imsi: e.info.imsi,
-      status: e.info.status,
-      error: e.info.error || null
-    }));
+   const payload = Array.from(portMap.values()).map(e => ({
+  port: e.info.port,
+  manufacturer: e.info.manufacturer,
+  modem: e.info.modem,
+  provider: e.info.provider,
+  imsi: e.info.imsi,
+  sn: e.info.sn || null,
+  msisdn: e.info.msisdn || null,
+  status: e.info.status,
+  error: e.info.error || null
+}));
 
     io.emit("ports", payload);
   } catch (e) {

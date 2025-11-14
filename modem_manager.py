@@ -1,0 +1,161 @@
+import serial
+import serial.tools.list_ports
+import time
+import re
+import mysql.connector
+from datetime import datetime
+import threading
+from flask_socketio import SocketIO
+
+db_config = {
+    "host": "localhost",
+    "user": "root",
+    "password": "",
+    "database": "chip_check"
+}
+
+socketio = None  # akan diisi dari app.py
+
+def connect_db():
+    try:
+        return mysql.connector.connect(**db_config)
+    except Exception as e:
+        print(f"❌ Gagal konek DB: {e}")
+        return None
+
+def simpan_log_modem(port, status_sim, provider):
+    conn = connect_db()
+    if not conn: return
+    cursor = conn.cursor()
+    waktu = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    cursor.execute("SELECT id FROM log_modem WHERE port=%s", (port,))
+    ada = cursor.fetchone()
+
+    if ada:
+        cursor.execute("""
+            UPDATE log_modem SET status_sim=%s, provider=%s, waktu=%s WHERE port=%s
+        """, (status_sim, provider, waktu, port))
+    else:
+        cursor.execute("""
+            INSERT INTO log_modem (port, status_sim, provider, waktu)
+            VALUES (%s,%s,%s,%s)
+        """, (port, status_sim, provider, waktu))
+    conn.commit()
+    cursor.close()
+    conn.close()
+
+    # Emit ke UI realtime
+    if socketio:
+        socketio.emit('update_modem', {
+            "port": port,
+            "status_sim": status_sim,
+            "provider": provider,
+            "waktu": waktu
+        })
+
+def simpan_sms(port, direction, nomor, pesan):
+    conn = connect_db()
+    if not conn: return
+    cursor = conn.cursor()
+    cursor.execute("""
+        INSERT INTO sms_log (port, direction, nomor, pesan, waktu)
+        VALUES (%s,%s,%s,%s,NOW())
+    """, (port, direction, nomor, pesan))
+    conn.commit()
+    cursor.close()
+    conn.close()
+
+    # Emit ke UI realtime
+    if socketio:
+        socketio.emit('new_sms', {
+            "port": port,
+            "direction": direction,
+            "nomor": nomor,
+            "pesan": pesan,
+            "waktu": datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        })
+
+def kirim_perintah(port, command, delay=0.4):
+    try:
+        ser = serial.Serial(port, 115200, timeout=1)
+        ser.write((command + "\r").encode())
+        time.sleep(delay)
+        response = ser.read_all().decode(errors='ignore')
+        ser.close()
+        return response.strip()
+    except Exception:
+        return ""
+
+def cek_modem(port, last_status):
+    hasil = {"port": port, "status_sim": "❌ Tidak terdeteksi", "provider": "-"}
+    resp_at = kirim_perintah(port, "AT")
+    if "OK" not in resp_at:
+        hasil["status_sim"] = "❌ Tidak merespons"
+        simpan_log_modem(port, hasil["status_sim"], hasil["provider"])
+        return
+
+    resp_sim = kirim_perintah(port, "AT+CPIN?")
+    if "+CPIN: READY" in resp_sim:
+        hasil["status_sim"] = "✅ READY"
+    elif "SIM PIN" in resp_sim:
+        hasil["status_sim"] = "🔒 Terkunci"
+    else:
+        hasil["status_sim"] = "❌ Tidak ada SIM"
+        simpan_log_modem(port, hasil["status_sim"], hasil["provider"])
+        return
+
+    resp_cops = kirim_perintah(port, "AT+COPS?")
+    match = re.search(r'\+COPS:.*,"([^"]+)"', resp_cops)
+    hasil["provider"] = match.group(1) if match else "Tidak terdeteksi"
+
+    current_state = f"{hasil['status_sim']}|{hasil['provider']}"
+    if port not in last_status or last_status[port] != current_state:
+        simpan_log_modem(port, hasil["status_sim"], hasil["provider"])
+        last_status[port] = current_state
+
+def kirim_sms(port, nomor, pesan):
+    try:
+        ser = serial.Serial(port, 115200, timeout=2)
+        ser.write(b'AT+CMGF=1\r')
+        time.sleep(0.5)
+        ser.write(f'AT+CMGS="{nomor}"\r'.encode())
+        time.sleep(0.5)
+        ser.write(pesan.encode() + b"\x1A")
+        time.sleep(3)
+        ser.close()
+        simpan_sms(port, "OUT", nomor, pesan)
+    except Exception as e:
+        print(f"❌ Gagal kirim SMS: {e}")
+
+def baca_sms(port):
+    try:
+        ser = serial.Serial(port, 115200, timeout=2)
+        ser.write(b'AT+CMGF=1\r')
+        time.sleep(0.5)
+        ser.write(b'AT+CMGL="ALL"\r')
+        time.sleep(2)
+        data = ser.read_all().decode(errors='ignore')
+        ser.close()
+
+        sms_pattern = r'\+CMGL: \d+,"[^"]+","([^"]+)"[^\n]*\n(.+?)(?=\r\n\+CMGL|\Z)'
+        for nomor, pesan in re.findall(sms_pattern, data, re.DOTALL):
+            simpan_sms(port, "IN", nomor, pesan.strip())
+    except Exception as e:
+        print(f"❌ Baca SMS gagal di {port}: {e}")
+
+def get_ports():
+    return [p.device for p in serial.tools.list_ports.comports()]
+
+def loop_monitor():
+    last_status = {}
+    while True:
+        ports = get_ports()
+        threads = []
+        for port in ports:
+            t = threading.Thread(target=cek_modem, args=(port, last_status))
+            threads.append(t)
+            t.start()
+            baca_sms(port)
+        for t in threads:
+            t.join()
+        time.sleep(5)

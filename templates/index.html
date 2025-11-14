@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <title>📡 Monitor Slot Modem Realtime</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body { background: #f8f9fa; }
+    .status-table th, .status-table td { vertical-align: middle; }
+  </style>
+</head>
+<body>
+  <div class="container py-4">
+    <h3 class="mb-4 text-center">📶 Monitor Slot Modem Realtime</h3>
+    <table class="table table-bordered table-striped text-center status-table">
+      <thead class="table-dark">
+        <tr>
+          <th>ID</th>
+          <th>Port</th>
+          <th>Status SIM</th>
+          <th>Provider</th>
+          <th>Waktu</th>
+        </tr>
+      </thead>
+      <tbody id="data-body">
+        <tr><td colspan="5" class="text-muted">Memuat data...</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <script>
+    async function loadData() {
+      try {
+        const res = await fetch('/status');
+        const data = await res.json();
+
+        const tbody = document.getElementById('data-body');
+        tbody.innerHTML = '';
+
+        if (data.length === 0) {
+          tbody.innerHTML = `<tr><td colspan="5" class="text-muted">Belum ada data log</td></tr>`;
+          return;
+        }
+
+        data.forEach((item, i) => {
+          let badgeClass = "secondary";
+          if (item.status_sim.includes("READY")) badgeClass = "success";
+          else if (item.status_sim.includes("Tidak ada")) badgeClass = "danger";
+          else if (item.status_sim.includes("Terkunci")) badgeClass = "warning";
+
+          tbody.innerHTML += `
+            <tr>
+              <td>${item.id}</td>
+              <td><b>${item.port}</b></td>
+              <td><span class="badge bg-${badgeClass}">${item.status_sim}</span></td>
+              <td>${item.provider}</td>
+              <td>${new Date(item.waktu).toLocaleString()}</td>
+            </tr>
+          `;
+        });
+      } catch (err) {
+        console.error("Gagal memuat data:", err);
+      }
+    }
+
+    loadData();
+    setInterval(loadData, 3000); // refresh setiap 3 detik
+  </script>
+</body>
+</html>

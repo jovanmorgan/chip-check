@@ -222,14 +222,29 @@ sendSmsBtn.addEventListener("click", async ()=>{
   }
 });
 
-// Saat server kirim notifikasi SMS masuk
 socket.on("port-notification", (data)=>{
   if(!data.line) return;
-  // Hanya tampilkan yang berhubungan dengan SMS masuk
-  if(data.line.includes("+CMT:") || data.line.includes("+CMGR")) {
-    const msg = data.line.replace(/\r|\n/g,"").trim();
-    appendSms("server", msg);
+  const msg = data.line.replace(/\r|\n/g,"").trim();
+
+  // tampilkan di modal SMS bila sedang dibuka
+  appendSms("server", msg);
+
+  // tambahan: tampilkan log di bawah tabel utama
+  let logBox = document.getElementById("logBox");
+  if(!logBox){
+    const div = document.createElement("div");
+    div.id = "logBox";
+    div.className = "mt-3 p-2 bg-white border rounded-3 shadow-sm";
+    div.style.maxHeight = "200px";
+    div.style.overflowY = "auto";
+    div.innerHTML = `<div class="fw-bold mb-1">📜 Log Pesan Masuk:</div>`;
+    table.parentElement.after(div);
+    logBox = div;
   }
+  const line = document.createElement("div");
+  line.innerHTML = `<span class="text-muted small">${new Date().toLocaleTimeString()}</span> — <span class="text-dark">${escapeHtml(msg)}</span>`;
+  logBox.appendChild(line);
+  logBox.scrollTop = logBox.scrollHeight;
 });
 
   // === USSD ===
