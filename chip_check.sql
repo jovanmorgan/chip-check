@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Waktu pembuatan: 11 Nov 2025 pada 08.58
+-- Waktu pembuatan: 14 Nov 2025 pada 02.55
 -- Versi server: 10.4.32-MariaDB
 -- Versi PHP: 8.2.12
 
@@ -9632,6 +9632,90 @@ INSERT INTO `cicle` (`id_cicle`, `id_chip`, `cicle`, `habis`, `hangus`, `tanggal
 -- --------------------------------------------------------
 
 --
+-- Struktur dari tabel `log_modem`
+--
+
+CREATE TABLE `log_modem` (
+  `id` int(11) NOT NULL,
+  `port` varchar(50) DEFAULT NULL,
+  `status_sim` varchar(100) DEFAULT NULL,
+  `provider` varchar(100) DEFAULT NULL,
+  `waktu` datetime DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data untuk tabel `log_modem`
+--
+
+INSERT INTO `log_modem` (`id`, `port`, `status_sim`, `provider`, `waktu`) VALUES
+(1, 'COM65', '❌ Tidak ada SIM', '-', '2025-11-14 09:46:41'),
+(2, 'COM40', '❌ Tidak ada SIM', '-', '2025-11-14 09:46:41'),
+(3, 'COM12', '❌ Tidak ada SIM', '-', '2025-11-14 09:46:41'),
+(4, 'COM47', '❌ Tidak ada SIM', '-', '2025-11-14 09:46:41'),
+(5, 'COM10', '❌ Tidak ada SIM', '-', '2025-11-14 09:46:41'),
+(6, 'COM5', '❌ Tidak ada SIM', '-', '2025-11-14 09:46:41'),
+(7, 'COM13', '❌ Tidak ada SIM', '-', '2025-11-14 09:46:41'),
+(8, 'COM44', '❌ Tidak ada SIM', '-', '2025-11-14 09:46:41'),
+(9, 'COM55', '❌ Tidak ada SIM', '-', '2025-11-14 09:46:41'),
+(10, 'COM6', '❌ Tidak ada SIM', '-', '2025-11-14 09:46:41'),
+(11, 'COM17', '❌ Tidak ada SIM', '-', '2025-11-14 09:46:41'),
+(12, 'COM29', '❌ Tidak ada SIM', '-', '2025-11-14 09:46:41'),
+(13, 'COM16', '❌ Tidak ada SIM', '-', '2025-11-14 09:46:41'),
+(14, 'COM63', '❌ Tidak ada SIM', '-', '2025-11-14 09:46:41'),
+(15, 'COM15', '❌ Tidak ada SIM', '-', '2025-11-14 09:46:41'),
+(16, 'COM21', '❌ Tidak ada SIM', '-', '2025-11-14 09:46:41'),
+(17, 'COM25', '❌ Tidak ada SIM', '-', '2025-11-14 09:46:41'),
+(18, 'COM3', '❌ Tidak ada SIM', '-', '2025-11-14 09:46:41'),
+(19, 'COM7', '❌ Tidak ada SIM', '-', '2025-11-14 09:46:41'),
+(20, 'COM14', '❌ Tidak ada SIM', '-', '2025-11-14 09:46:41'),
+(21, 'COM9', '❌ Tidak ada SIM', '-', '2025-11-14 09:46:41'),
+(22, 'COM27', '❌ Tidak ada SIM', '-', '2025-11-14 09:46:41'),
+(23, 'COM31', '❌ Tidak ada SIM', '-', '2025-11-14 09:46:41'),
+(24, 'COM57', '❌ Tidak ada SIM', '-', '2025-11-14 09:46:41'),
+(25, 'COM11', '❌ Tidak ada SIM', '-', '2025-11-14 09:46:41'),
+(26, 'COM42', '❌ Tidak ada SIM', '-', '2025-11-14 09:46:41'),
+(27, 'COM4', '❌ Tidak ada SIM', '-', '2025-11-14 09:46:41'),
+(28, 'COM49', '❌ Tidak ada SIM', '-', '2025-11-14 09:46:41'),
+(29, 'COM36', '❌ Tidak ada SIM', '-', '2025-11-14 09:46:41'),
+(30, 'COM61', '❌ Tidak ada SIM', '-', '2025-11-14 09:46:41'),
+(31, 'COM32', '❌ Tidak ada SIM', '-', '2025-11-14 09:46:41'),
+(32, 'COM34', '❌ Tidak ada SIM', '-', '2025-11-14 09:46:41'),
+(33, 'COM8', '❌ Tidak ada SIM', '-', '2025-11-14 09:46:41'),
+(34, 'COM30', '❌ Tidak ada SIM', '-', '2025-11-14 09:46:41'),
+(35, 'COM35', '❌ Tidak ada SIM', '-', '2025-11-14 09:46:41'),
+(36, 'COM37', '❌ Tidak ada SIM', '-', '2025-11-14 09:46:41'),
+(37, 'COM58', '❌ Tidak ada SIM', '-', '2025-11-14 09:46:41'),
+(38, 'COM39', '❌ Tidak ada SIM', '-', '2025-11-14 09:46:41'),
+(39, 'COM22', '❌ Tidak ada SIM', '-', '2025-11-14 09:46:41'),
+(40, 'COM41', '❌ Tidak ada SIM', '-', '2025-11-14 09:46:41'),
+(41, 'COM62', '❌ Tidak ada SIM', '-', '2025-11-14 09:46:41'),
+(42, 'COM54', '❌ Tidak ada SIM', '-', '2025-11-14 09:46:41'),
+(43, 'COM18', '❌ Tidak ada SIM', '-', '2025-11-14 09:46:41'),
+(44, 'COM28', '❌ Tidak ada SIM', '-', '2025-11-14 09:46:41'),
+(45, 'COM38', '❌ Tidak ada SIM', '-', '2025-11-14 09:46:41'),
+(46, 'COM59', '❌ Tidak ada SIM', '-', '2025-11-14 09:46:41'),
+(47, 'COM33', '❌ Tidak ada SIM', '-', '2025-11-14 09:46:41'),
+(48, 'COM60', '❌ Tidak ada SIM', '-', '2025-11-14 09:46:41'),
+(49, 'COM66', '❌ Tidak ada SIM', '-', '2025-11-14 09:46:41'),
+(50, 'COM51', '❌ Tidak ada SIM', '-', '2025-11-14 09:46:41'),
+(51, 'COM50', '❌ Tidak ada SIM', '-', '2025-11-14 09:46:41'),
+(52, 'COM26', '❌ Tidak ada SIM', '-', '2025-11-14 09:46:41'),
+(53, 'COM46', '❌ Tidak ada SIM', '-', '2025-11-14 09:46:41'),
+(54, 'COM45', '❌ Tidak ada SIM', '-', '2025-11-14 09:46:41'),
+(55, 'COM43', '❌ Tidak ada SIM', '-', '2025-11-14 09:46:41'),
+(56, 'COM48', '❌ Tidak ada SIM', '-', '2025-11-14 09:46:41'),
+(57, 'COM53', '❌ Tidak ada SIM', '-', '2025-11-14 09:46:41'),
+(58, 'COM23', '❌ Tidak ada SIM', '-', '2025-11-14 09:46:41'),
+(59, 'COM20', '❌ Tidak ada SIM', '-', '2025-11-14 09:46:41'),
+(60, 'COM24', '❌ Tidak ada SIM', '-', '2025-11-14 09:46:41'),
+(61, 'COM19', '❌ Tidak ada SIM', '-', '2025-11-14 09:46:41'),
+(62, 'COM52', '✅ READY', 'TELKOMSEL', '2025-11-14 02:40:51'),
+(63, 'COM56', '✅ READY', 'TELKOMSEL', '2025-11-14 02:40:51'),
+(64, 'COM64', '✅ READY', 'TELKOMSEL', '2025-11-14 02:40:51');
+
+-- --------------------------------------------------------
+
+--
 -- Struktur dari tabel `petugas`
 --
 
@@ -9682,6 +9766,13 @@ ALTER TABLE `cicle`
   ADD PRIMARY KEY (`id_cicle`);
 
 --
+-- Indeks untuk tabel `log_modem`
+--
+ALTER TABLE `log_modem`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `port` (`port`);
+
+--
 -- Indeks untuk tabel `petugas`
 --
 ALTER TABLE `petugas`
@@ -9714,6 +9805,12 @@ ALTER TABLE `chip`
 --
 ALTER TABLE `cicle`
   MODIFY `id_cicle` int(12) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3956;
+
+--
+-- AUTO_INCREMENT untuk tabel `log_modem`
+--
+ALTER TABLE `log_modem`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=65;
 
 --
 -- AUTO_INCREMENT untuk tabel `petugas`
